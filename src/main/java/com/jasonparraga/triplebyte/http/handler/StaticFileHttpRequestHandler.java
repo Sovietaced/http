@@ -18,7 +18,7 @@ public class StaticFileHttpRequestHandler implements HttpRequestHandler {
 
     @Override
     public Optional<HttpResponse> handleRequest(HttpRequest request) throws HttpRequestHandlerException {
-        Path fileSystemPath = getFileSystemPath(fileSystemBasePath, request.getPath());
+        Path fileSystemPath = HttpRequestHandlerUtils.getFileSystemPath(fileSystemBasePath, request.getPath());
 
         byte[] fileContent = getContentForFile(fileSystemPath);
 
@@ -39,20 +39,6 @@ public class StaticFileHttpRequestHandler implements HttpRequestHandler {
         }
 
         return null;
-    }
-
-    /**
-     * Resolves the file system path for the file specified by the given
-     * resource path.
-     * @param base
-     * @param resourcePath
-     * @return
-     */
-    private Path getFileSystemPath(Path base, String resourcePath) {
-        // Left strip leading dir
-        resourcePath = resourcePath.replaceFirst("/", "");
-        // Generate new path
-        return fileSystemBasePath.resolve(resourcePath);
     }
 
 }

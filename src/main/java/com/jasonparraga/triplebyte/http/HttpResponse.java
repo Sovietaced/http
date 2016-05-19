@@ -1,18 +1,27 @@
 package com.jasonparraga.triplebyte.http;
 
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 
+import com.google.common.base.Joiner;
+import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Bytes;
 import com.jasonparraga.triplebyte.http.handler.HttpRequestHandlerException;
 
 public class HttpResponse {
 
+    private final Map<HttpHeader, Set<String>> headers;
     private final HttpStatus status;
     private final String path;
     private final String version;
     private final byte[] body;
 
     public HttpResponse(Builder b) {
+        headers = ImmutableMap.copyOf(b.headers);
         status = b.status;
         path = b.path;
         version = b.version;
@@ -21,6 +30,7 @@ public class HttpResponse {
 
     public static final class Builder {
 
+        private final Map<HttpHeader, Set<String>> headers = new HashMap<>();
         private HttpStatus status;
         private String path;
         private String version;
@@ -49,6 +59,11 @@ public class HttpResponse {
             return this;
         }
 
+        public Builder addHeader(HttpHeader header, Set<String> values) {
+            this.headers.put(header, values);
+            return this;
+        }
+
         public HttpResponse build() {
             return new HttpResponse(this);
         }
@@ -64,6 +79,14 @@ public class HttpResponse {
         // Append response line
         sb.append(String.format("%s %s \r\n", version, status));
 
+        // Add headers
+        for (Entry<HttpHeader, Set<String>> entry : headers.entrySet()) {
+            HttpHeader header = entry.getKey();
+            String value = Joiner.on(", ").join(entry.getValue());
+            sb.append(String.format("%s %s", header.getValue(), value));
+            sb.append("\r\n");
+        }
+
         // Add content length header if we have content..
         if (body != null) {
             sb.append(String.format("%s: %d", HttpHeader.CONTENT_LENGTH.getValue(), body.length));
@@ -73,11 +96,11 @@ public class HttpResponse {
         // End headers
         sb.append("\r\n");
 
-        String headers = sb.toString();
+        String headerString = sb.toString();
         if (body != null) {
-            return Bytes.concat(headers.getBytes(), body);
+            return Bytes.concat(headerString.getBytes(), body);
         } else {
-            return headers.getBytes();
+            return headerString.getBytes();
         }
     }
 
@@ -97,11 +120,25 @@ public class HttpResponse {
     }
 
     public static HttpResponse internalServerError(HttpRequest request, HttpRequestHandlerException e) {
-        // TODO Auto-generated method stub
-        return null;
+        return new HttpResponse.Builder()
+                .version(request.getVersion())
+                .status(HttpStatus.internalServerError())
+                .addHeader(HttpHeader.CONTENT_TYPE, Collections.singleton("text/plain"))
+                .body("Internal Sever Error\n".getBytes())
+                .build();
     }
 
     public HttpStatus getStatus() {
         return status;
+    }
+
+    public static HttpResponse requestTimedOut(HttpRequest request,
+                           HttpRequestHandlerException handlerException) {
+        return new HttpResponse.Builder()
+                .version(request.getVersion())
+                .status(HttpStatus.requestTimedOut())
+                .addHeader(HttpHeader.CONTENT_TYPE, Collections.singleton("text/plain"))
+                .body("Request Timed Out\n".getBytes())
+                .build();
     }
 }

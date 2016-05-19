@@ -29,4 +29,12 @@ public class HttpStatus {
     public static HttpStatus notFound() {
         return new HttpStatus("NOT FOUND", 404);
     }
+
+    public static HttpStatus internalServerError() {
+        return new HttpStatus("INTERNAL SERVER ERROR", 500);
+    }
+
+    public static HttpStatus requestTimedOut() {
+        return new HttpStatus("REQUEST TIMED OUT", 408);
+    }
 }

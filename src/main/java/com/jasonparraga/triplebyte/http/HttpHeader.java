@@ -8,7 +8,8 @@ public enum HttpHeader {
     ACCEPT_LANGUAGE("Accept-Language"),
     ACCEPT_ENCODING("Accept-Encoding"),
     CONNECTION("Connection"),
-    CONTENT_LENGTH("Content-Length");
+    CONTENT_LENGTH("Content-Length"),
+    CONTENT_TYPE("Content-Type");
 
     private final String value;
 

@@ -1,8 +1,8 @@
 package com.jasonparraga.triplebyte.http.handler;
 
-import java.util.LinkedList;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
-import java.util.Queue;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,14 +14,14 @@ public class HttpRequestHandlerManager {
 
     private static final Logger log = LoggerFactory.getLogger(HttpRequestHandlerManager.class);
 
-    private final Queue<HttpRequestHandler> requestHandlers = new LinkedList<>();
+    private final List<HttpRequestHandler> requestHandlers = new ArrayList<>();
 
     /**
      * Registers a {@link HttpRequestHandler} at the front of the line.
      * @param handler
      */
     public void registerHandler(HttpRequestHandler handler) {
-        requestHandlers.add(handler);
+        requestHandlers.add(0, handler);
     }
 
     public HttpResponse handleRequest(HttpRequest request) {

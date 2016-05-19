@@ -4,8 +4,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.Socket;
+import java.util.Arrays;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -21,10 +21,14 @@ public class HttpRequest {
     private final Verb verb;
     private final String path;
     private final String version;
+    byte[] body;
 
     public enum Verb {
         GET,
-        POST;
+        POST,
+        PUT,
+        PATCH,
+        DELETE;
     }
 
     public HttpRequest(Builder b) {
@@ -32,6 +36,7 @@ public class HttpRequest {
         path = b.path;
         version = b.version;
         headers = ImmutableMap.copyOf(b.headers);
+        body = b.body;
     }
 
     public static final class Builder {
@@ -40,6 +45,7 @@ public class HttpRequest {
         private String path;
         private String version;
         private final Map<HttpHeader, Set<String>> headers = new HashMap<>();
+        private byte[] body;
 
         public Builder() {
         }
@@ -64,27 +70,14 @@ public class HttpRequest {
             return this;
         }
 
+        public Builder body(byte[] body) {
+            this.body = Arrays.copyOf(body, body.length);
+            return this;
+        }
+
         public HttpRequest build() {
             return new HttpRequest(this);
         }
-    }
-
-    /**
-     * Parses an {@link HttpRequest} from a list of strings.
-     * @param input
-     * @return
-     */
-    public static HttpRequest of(List<String> input) {
-        HttpRequest.Builder request = new HttpRequest.Builder();
-        System.out.println(input);
-        // Parse the request line
-        String requestLine = input.get(0);
-        String[] requestLineParts = requestLine.split(" ");
-        request.verb = Verb.valueOf(requestLineParts[0]);
-        request.path = requestLineParts[1];
-        request.version = requestLineParts[2];
-
-        return request.build();
     }
 
     /**
@@ -107,13 +100,11 @@ public class HttpRequest {
         request.path = requestLineParts[1];
         request.version = requestLineParts[2];
 
+        int contentLength = 0;
+
         // Read Headers
         String line = reader.readLine();
-        while (line != null) {
-            if (line.isEmpty()) {
-                // Done reading headers
-                break;
-            }
+        while (line != null && line.isEmpty()) {
 
             // Split header/values
             String[] headerValueSplit = line.split(": ");
@@ -122,8 +113,25 @@ public class HttpRequest {
             Set<String> values = Sets.newHashSet(valuesSplit);
             request.addHeader(header, values);
 
+            if (header == HttpHeader.CONTENT_LENGTH) {
+                contentLength = Integer.parseInt(valuesSplit[0]);
+            }
+
             // Move sentinel value
             line = reader.readLine();
+        }
+
+        // Read in content if available
+        if (contentLength > 0) {
+            int index = 0;
+            byte[] content = new byte[contentLength];
+
+            while (index < contentLength && reader.ready()) {
+                int valueRead = reader.read();
+                content[index] = (byte) valueRead;
+                index++;
+            }
+            request.body(content);
         }
 
         return request.build();
@@ -148,6 +156,10 @@ public class HttpRequest {
 
     public Verb getVerb() {
         return verb;
+    }
+
+    public byte[] getBody() {
+        return body;
     }
 
 }
