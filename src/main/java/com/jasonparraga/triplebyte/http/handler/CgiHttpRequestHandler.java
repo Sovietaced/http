@@ -4,9 +4,12 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -14,6 +17,9 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import com.google.common.base.Joiner;
 import com.google.common.io.ByteStreams;
@@ -23,13 +29,14 @@ import com.jasonparraga.triplebyte.http.HttpResponse;
 import com.jasonparraga.triplebyte.http.HttpStatus;
 
 public class CgiHttpRequestHandler implements HttpRequestHandler {
+    private static final Logger log = LoggerFactory.getLogger(CgiHttpRequestHandler.class);
 
-    private static final String CGI_DIR = "/cgi-bin";
     private final Path fileSystemBasePath;
     private final ExecutorService execService = Executors.newFixedThreadPool(1);
     private int time = DEFAULT_TIME;
     private TimeUnit timeUnit = DEFAULT_TIME_UNIT;
 
+    private static final String CGI_DIR = "/cgi-bin";
     private static final int DEFAULT_TIME = 10;
     private static final TimeUnit DEFAULT_TIME_UNIT = TimeUnit.SECONDS;
 
@@ -42,7 +49,6 @@ public class CgiHttpRequestHandler implements HttpRequestHandler {
         this.time = time;
         this.timeUnit = timeUnit;
     }
-
 
     @Override
     public Optional<HttpResponse> handleRequest(HttpRequest request) throws HttpRequestHandlerException {
@@ -69,19 +75,18 @@ public class CgiHttpRequestHandler implements HttpRequestHandler {
 
             if (request.getHeaders().containsKey(HttpHeader.CONTENT_TYPE)) {
                 builder.addHeader(HttpHeader.CONTENT_TYPE, request.getHeaders().get(HttpHeader.CONTENT_TYPE));
+            } else {
+                builder.addHeader(HttpHeader.CONTENT_TYPE, Collections.singleton("text/plain"));
             }
 
             return builder.build();
         } catch (TimeoutException e) {
             // Handle timeouts!
-            HttpRequestHandlerException handlerException =
-                    new HttpRequestHandlerException("Timed out while executing " + fileSystemPath, e);
-            return HttpResponse.requestTimedOut(request, handlerException);
+            log.warn("Timed out handling request {}", request, e);
+            return HttpResponse.requestTimedOut(request);
         } catch (InterruptedException | ExecutionException e) {
             // Anything else should be an internal server error
-            HttpRequestHandlerException handlerException =
-                    new HttpRequestHandlerException("Failed to execute " + fileSystemPath, e);
-            return HttpResponse.internalServerError(request, handlerException);
+            throw new HttpRequestHandlerException(e);
         }
 
     }
@@ -110,34 +115,53 @@ public class CgiHttpRequestHandler implements HttpRequestHandler {
             // The command is simply the file path to execute
             command.add(path.toAbsolutePath().toString());
 
-                ProcessBuilder builder = new ProcessBuilder(command);
+            log.info("Executing process with command {}.", command);
 
-                loadEnvironmentVariables(builder, request);
+            ProcessBuilder builder = new ProcessBuilder(command);
 
-                final Process process = builder.start();
+            loadEnvironmentVariables(builder, request);
 
-                // If we have any POST data write it to STD IN
-                if (request.getBody() != null) {
-                    process.getOutputStream().write(request.getBody());
-                    process.getOutputStream().flush();
-                    process.getOutputStream().close();
-                }
-                // Wait for the process to complete
-                process.waitFor();
+            long start = System.nanoTime();
+            final Process process = builder.start();
 
-                InputStream is = process.getInputStream();
-                return ByteStreams.toByteArray(is);
+            // If we have any POST data write it to STD IN
+            if (request.getBody() != null) {
+                process.getOutputStream().write(request.getBody());
+                process.getOutputStream().flush();
+                process.getOutputStream().close();
+            }
+            // Wait for the process to complete
+            process.waitFor();
+
+            long elapsedMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start);
+            log.info("Process with command {} exited with code {} in {} ms",
+                     command, process.exitValue(), elapsedMs);
+
+            // Read in STD out
+            InputStream is = process.getInputStream();
+            return ByteStreams.toByteArray(is);
         }
     }
 
     private Map<String, String> loadEnvironmentVariables(ProcessBuilder builder, HttpRequest request) {
         Map<String, String> environ = builder.environment();
 
-        if (request.getHeaders().containsKey(HttpHeader.CONTENT_TYPE)) {
-            environ.put(HttpHeader.CONTENT_LENGTH.toString(), Joiner.on(" ").join(request.getHeaders().get(HttpHeader.CONTENT_LENGTH)));
+        for (Entry<HttpHeader, Set<String>> entry : request.getHeaders().entrySet()) {
+            HttpHeader header = entry.getKey();
+            String value = Joiner.on(",").join(entry.getValue());
+
+            if (header == HttpHeader.CONTENT_TYPE) {
+                environ.put(CgiEnvironmentVariable.CONTENT_TYPE.toString(), value);
+            } else if (header == HttpHeader.HOST) {
+                environ.put(CgiEnvironmentVariable.SERVER_NAME.toString(), value);
+            } else if (header == HttpHeader.CONTENT_LENGTH) {
+                environ.put(CgiEnvironmentVariable.CONTENT_LENGTH.toString(), value);
+            } else if (header == HttpHeader.USER_AGENT) {
+                environ.put(CgiEnvironmentVariable.HTTP_USER_AGENT.toString(), value);
+            }
         }
 
-        //
+        // Handle basic headers form request line
         environ.put(CgiEnvironmentVariable.REQUEST_METHOD.toString(), request.getVerb().toString());
         environ.put(CgiEnvironmentVariable.SERVER_PROTOCOL.toString(), request.getVersion());
 

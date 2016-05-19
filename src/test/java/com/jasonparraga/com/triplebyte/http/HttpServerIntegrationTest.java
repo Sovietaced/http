@@ -15,6 +15,7 @@ import org.junit.Test;
 import org.junit.rules.TemporaryFolder;
 
 import com.jasonparraga.triplebyte.http.HttpServer;
+import com.jasonparraga.triplebyte.http.handler.StaticFileHttpRequestHandler;
 import com.mashape.unirest.http.HttpResponse;
 import com.mashape.unirest.http.Unirest;
 
@@ -32,7 +33,8 @@ public class HttpServerIntegrationTest {
     @Before
     public void setup() throws IOException {
         path = Paths.get(folder.getRoot().getAbsolutePath());
-        httpServer = new HttpServer(0, path);
+        httpServer = new HttpServer(0);
+        httpServer.registerHandler(new StaticFileHttpRequestHandler(path));
         httpServer.run();
         baseUrl = String.format("http://127.0.0.1:%d", httpServer.getPort());
     }

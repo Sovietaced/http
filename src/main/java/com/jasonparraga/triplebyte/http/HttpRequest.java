@@ -104,8 +104,7 @@ public class HttpRequest {
 
         // Read Headers
         String line = reader.readLine();
-        while (line != null && line.isEmpty()) {
-
+        while (line != null && !line.isEmpty()) {
             // Split header/values
             String[] headerValueSplit = line.split(": ");
             HttpHeader header = HttpHeader.forValue(headerValueSplit[0]);

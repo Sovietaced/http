@@ -5,7 +5,13 @@ public enum CgiEnvironmentVariable {
     SERVER_PROTOCOL,
     SERVER_PORT,
     SERVER_NAME,
-    REQUEST_METHOD;
+    REQUEST_METHOD,
+    // Not used
+    QUERY_STRING,
+    REMOTE_ADDR,
+    CONTENT_TYPE,
+    CONTENT_LENGTH,
+    HTTP_USER_AGENT;
 
 
     public static CgiEnvironmentVariable forValue(String value) {

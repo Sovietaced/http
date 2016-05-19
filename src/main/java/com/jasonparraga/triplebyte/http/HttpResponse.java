@@ -10,8 +10,10 @@ import java.util.Set;
 import com.google.common.base.Joiner;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.primitives.Bytes;
-import com.jasonparraga.triplebyte.http.handler.HttpRequestHandlerException;
 
+/**
+ * Java representation of an HTTP response
+ */
 public class HttpResponse {
 
     private final Map<HttpHeader, Set<String>> headers;
@@ -73,6 +75,10 @@ public class HttpResponse {
         return path;
     }
 
+    public HttpStatus getStatus() {
+        return status;
+    }
+
     public byte[] getBytes() {
         StringBuilder sb = new StringBuilder();
 
@@ -83,7 +89,7 @@ public class HttpResponse {
         for (Entry<HttpHeader, Set<String>> entry : headers.entrySet()) {
             HttpHeader header = entry.getKey();
             String value = Joiner.on(", ").join(entry.getValue());
-            sb.append(String.format("%s %s", header.getValue(), value));
+            sb.append(String.format("%s: %s", header.getValue(), value));
             sb.append("\r\n");
         }
 
@@ -108,6 +114,8 @@ public class HttpResponse {
         return new HttpResponse.Builder()
                 .version(request.getVersion())
                 .status(HttpStatus.notFound())
+                .addHeader(HttpHeader.CONTENT_TYPE, Collections.singleton("text/plain"))
+                .body("Not Found\n".getBytes())
                 .build();
     }
 
@@ -119,7 +127,7 @@ public class HttpResponse {
                 .build();
     }
 
-    public static HttpResponse internalServerError(HttpRequest request, HttpRequestHandlerException e) {
+    public static HttpResponse internalServerError(HttpRequest request) {
         return new HttpResponse.Builder()
                 .version(request.getVersion())
                 .status(HttpStatus.internalServerError())
@@ -128,12 +136,7 @@ public class HttpResponse {
                 .build();
     }
 
-    public HttpStatus getStatus() {
-        return status;
-    }
-
-    public static HttpResponse requestTimedOut(HttpRequest request,
-                           HttpRequestHandlerException handlerException) {
+    public static HttpResponse requestTimedOut(HttpRequest request) {
         return new HttpResponse.Builder()
                 .version(request.getVersion())
                 .status(HttpStatus.requestTimedOut())

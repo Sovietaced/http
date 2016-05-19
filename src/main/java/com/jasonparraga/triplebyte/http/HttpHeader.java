@@ -23,7 +23,7 @@ public enum HttpHeader {
 
     public static HttpHeader forValue(String value) {
         for(HttpHeader h : values()) {
-            if(value.equals(h.getValue())) {
+            if(value.toLowerCase().equals(h.getValue().toLowerCase())) {
                return h;
             }
         }

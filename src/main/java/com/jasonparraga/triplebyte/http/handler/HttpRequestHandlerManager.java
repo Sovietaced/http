@@ -30,7 +30,10 @@ public class HttpRequestHandlerManager {
             try {
                 maybeResponse = handler.handleRequest(request);
             } catch (HttpRequestHandlerException e) {
-                return HttpResponse.internalServerError(request, e);
+                log.error("{} could not handle request {}.",
+                          handler.getClass().getSimpleName(), request,
+                          e);
+                return HttpResponse.internalServerError(request);
             }
 
             if (maybeResponse.isPresent()) {
