@@ -4,7 +4,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -68,23 +67,21 @@ public class CgiHttpRequestHandler implements HttpRequestHandler {
 
         try {
             byte[] result = future.get(time, timeUnit);
+
+            CgiResponse cgiResponse = CgiResponse.of(result);
+
             HttpResponse.Builder builder = new HttpResponse.Builder()
                     .version(request.getVersion())
+                    .addHeaders(cgiResponse.getHeaders())
                     .status(HttpStatus.ok())
-                    .body(result);
-
-            if (request.getHeaders().containsKey(HttpHeader.CONTENT_TYPE)) {
-                builder.addHeader(HttpHeader.CONTENT_TYPE, request.getHeaders().get(HttpHeader.CONTENT_TYPE));
-            } else {
-                builder.addHeader(HttpHeader.CONTENT_TYPE, Collections.singleton("text/plain"));
-            }
+                    .body(cgiResponse.getBody());
 
             return builder.build();
         } catch (TimeoutException e) {
             // Handle timeouts!
             log.warn("Timed out handling request {}", request, e);
             return HttpResponse.requestTimedOut(request);
-        } catch (InterruptedException | ExecutionException e) {
+        } catch (InterruptedException | ExecutionException | IOException e) {
             // Anything else should be an internal server error
             throw new HttpRequestHandlerException(e);
         }

@@ -3,6 +3,7 @@ package com.jasonparraga.triplebyte.http;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -23,7 +24,7 @@ public class HttpServer {
     private final ServerSocket serverSocket;
     private volatile boolean running = false;
     // No multi threading for now...
-    private final ExecutorService execService = Executors.newFixedThreadPool(1);
+    private final ExecutorService execService = Executors.newFixedThreadPool(10);
 
     /**
      * Constructor for the {@link HttpServier}
@@ -72,21 +73,65 @@ public class HttpServer {
         @Override
         public void run() {
             while (true) {
+                try {
+                    Socket clientSocket = serverSocket.accept();
+                    ServerTask task = new ServerTask(clientSocket);
+                    execService.submit(task);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+        }
+    }
 
-                // Open Socket
-                try (Socket clientSocket = serverSocket.accept();){
+    public class ServerTask implements Runnable {
+
+        private final Socket clientSocket;
+
+        public ServerTask(Socket clientSocket) {
+            this.clientSocket = clientSocket;
+        }
+
+        @Override
+        public void run() {
+         // Open Socket
+            try {
+                boolean keepAlive = true;
+                int numRequests = 0;
+
+                while (keepAlive) {
                     // Read in HTTP request
                     HttpRequest request = HttpRequest.of(clientSocket);
+
+                    System.out.println(request.getHeaders());
+                    boolean keepAliveFound = false;
+                    if (request.getHeaders().containsKey(HttpHeader.CONNECTION)) {
+                        Set<String> values = request.getHeaders().get(HttpHeader.CONNECTION);
+
+                        for (String value : values) {
+                            if (value.toLowerCase().equals("keep-alive")) {
+                                keepAliveFound = true;
+                            }
+                        }
+                    }
+
+                    keepAlive = keepAliveFound;
 
                     HttpResponse response = handlerManager.handleRequest(request);
 
                     clientSocket.getOutputStream().write(response.getBytes());
+                    clientSocket.getOutputStream().flush();
 
-                } catch (Throwable e) {
-                    log.error("Unexpected exception occurred. Shutting down.", e);
-                    shutdown();
+                    log.info("Served request {} on this socket for host {}", ++numRequests, clientSocket.getInetAddress().getHostName());
                 }
+
+                clientSocket.getOutputStream().close();
+
+            } catch (Throwable e) {
+                log.error("Unexpected exception occurred. Shutting down.", e);
+                shutdown();
             }
         }
+
     }
 }

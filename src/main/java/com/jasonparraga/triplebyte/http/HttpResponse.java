@@ -66,6 +66,11 @@ public class HttpResponse {
             return this;
         }
 
+        public Builder addHeaders(Map<HttpHeader, Set<String>> headers) {
+            this.headers.putAll(headers);
+            return this;
+        }
+
         public HttpResponse build() {
             return new HttpResponse(this);
         }
